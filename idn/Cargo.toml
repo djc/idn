@@ -1,0 +1,14 @@
+[package]
+name = "idn"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.81"
+description = "Fast, small and simple IDNA implementation"
+license = "MIT OR Apache-2.0"
+keywords = ["idna", "punycode", "unicode", "dns", "no-std"]
+categories = ["encoding", "internationalization", "no-std"]
+readme = "../README.md"
+include = ["src/**/*.rs", "LICENSE-*"]
+
+[lints]
+workspace = true

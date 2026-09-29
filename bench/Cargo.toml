@@ -1,0 +1,25 @@
+[package]
+name = "bench"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Benchmarks comparing idn against versions 1.1 and 0.5 of the idna crate"
+
+[features]
+__bench_codspeed = ["dep:codspeed-criterion-compat"]
+
+[dependencies]
+codspeed-criterion-compat = { version = "5", optional = true }
+idn = { path = "../idn" }
+idna = "1.1"
+idna-0-5 = { package = "idna", version = "0.5" }
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false }
+
+[[bench]]
+name = "compare"
+harness = false
+
+[lints]
+workspace = true

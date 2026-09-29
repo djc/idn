@@ -1,0 +1,12 @@
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+ignore = [
+    { id = "RUSTSEC-2024-0421", reason = "idna 0.5 is only used as a baseline in the benchmarks" },
+]
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "MPL-2.0", "Unicode-3.0"]
+private = { ignore = true }
