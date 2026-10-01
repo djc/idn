@@ -105,8 +105,8 @@ pub(crate) fn encode_into(input: &[char], out: &mut String) -> Result<(), usize>
         out.push('-');
     }
 
-    // `len` is bounded by `MAX_INPUT`, so neither it nor `delta` can overflow (see
-    // `MAX_ENCODE_DELTA`).
+    // `len` is bounded by `MAX_INPUT`, so neither it nor `delta` can overflow
+    const { assert!(MAX_ENCODE_DELTA <= u32::MAX as u64) };
     let len = input.len() as u32;
     let mut handled = basic;
     let mut n = INITIAL_N;
@@ -210,7 +210,6 @@ const MAX_INPUT: usize = 2000;
 /// the step to the next code point, and by at most `len` in each of two passes over the input.
 const MAX_ENCODE_DELTA: u64 =
     (0x10_ffff - INITIAL_N as u64) * (MAX_INPUT as u64 + 1) + 2 * MAX_INPUT as u64;
-const _: () = assert!(MAX_ENCODE_DELTA <= u32::MAX as u64);
 
 #[cfg(test)]
 mod tests {

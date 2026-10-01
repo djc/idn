@@ -47,6 +47,8 @@ jobs:
         with:
           toolchain: 1.81.0
       - run: cargo check -p idn
+        env:
+          RUSTFLAGS: -Dwarnings
 
   lint:
     runs-on: ubuntu-latest
