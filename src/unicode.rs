@@ -103,11 +103,13 @@ pub enum Mode {
 }
 
 /// Returns whether the General_Category of `c` is Mark (Mn, Mc or Me)
+#[inline]
 pub fn is_mark(c: char) -> bool {
     PROPERTIES.get(c) & MARK_BIT != 0
 }
 
 /// Returns whether the Canonical_Combining_Class of `c` is Virama
+#[inline]
 pub fn is_virama(c: char) -> bool {
     Entry::of(c).ccc() == VIRAMA
 }
@@ -170,6 +172,7 @@ pub enum BidiClass {
 
 impl From<char> for BidiClass {
     /// Returns the Bidi_Class property value of `c`
+    #[inline]
     fn from(c: char) -> Self {
         BIDI_CLASSES[usize::from(PROPERTIES.get(c) & BIDI_CLASS_MASK)]
     }
@@ -195,6 +198,7 @@ pub enum JoiningType {
 
 impl From<char> for JoiningType {
     /// Returns the Joining_Type property value of `c`
+    #[inline]
     fn from(c: char) -> Self {
         JOINING_TYPES[usize::from((PROPERTIES.get(c) >> JOINING_TYPE_SHIFT) & JOINING_TYPE_MASK)]
     }
@@ -594,10 +598,12 @@ impl<T, const N: usize> DerefMut for Buffer<T, N> {
 struct Entry(u32);
 
 impl Entry {
+    #[inline]
     fn of(c: char) -> Self {
         Self(MAPPING.get(c))
     }
 
+    #[inline]
     fn kind(self) -> Kind {
         KINDS[((self.0 >> KIND_SHIFT) & KIND_MASK) as usize]
     }
@@ -606,6 +612,7 @@ impl Entry {
     ///
     /// The generator guarantees that the target is a valid `char`, which the exhaustive tests
     /// confirm, so the fallback is never used.
+    #[inline]
     fn target(self, c: char) -> char {
         let target = u32::from(c).wrapping_add(self.payload()) & PAYLOAD_MASK;
         char::from_u32(target).unwrap_or(REPLACEMENT)
@@ -614,6 +621,7 @@ impl Entry {
     /// The composed and decomposed (UTF-16) forms (for `Kind::PoolComposed`)
     ///
     /// The pool stores the composed form, followed by the decomposed form of length `len`.
+    #[inline]
     fn pool_composed(self) -> (char, &'static [u16]) {
         let (offset, len) = self.pool_range();
         let pool = &tables::MAPPING_POOL[offset..];
@@ -627,20 +635,24 @@ impl Entry {
     }
 
     /// The decomposed form, in UTF-16 (for `Kind::Pool` and `Kind::PoolBoundary`)
+    #[inline]
     fn pool(self) -> &'static [u16] {
         let (offset, len) = self.pool_range();
         &tables::MAPPING_POOL[offset..offset + len]
     }
 
+    #[inline]
     fn pool_range(self) -> (usize, usize) {
         let payload = self.payload() as usize;
         (payload & POOL_OFFSET_MASK, payload >> POOL_OFFSET_BITS)
     }
 
+    #[inline]
     fn payload(self) -> u32 {
         self.0 & PAYLOAD_MASK
     }
 
+    #[inline]
     fn ccc(self) -> u8 {
         (self.0 >> CCC_SHIFT) as u8
     }
