@@ -2,10 +2,11 @@ use core::hint::black_box;
 
 use codspeed_criterion_compat::{Criterion, criterion_group, criterion_main};
 use idn::Config;
-use idna::uts46::{AsciiDenyList, Hyphens, Uts46};
+use idna::uts46::{AsciiDenyList, DnsLength, Hyphens, Uts46};
 
 fn to_ascii(c: &mut Criterion) {
     let mut group = c.benchmark_group("to_ascii");
+    let uts46 = Uts46::new();
     let config = Config::new();
     for (name, input) in INPUTS {
         group.bench_function(format!("idn/{name}"), |b| {
@@ -13,7 +14,13 @@ fn to_ascii(c: &mut Criterion) {
         });
         group.bench_function(format!("idna/{name}"), |b| {
             b.iter(|| {
-                idna::domain_to_ascii_cow(black_box(input.as_bytes()), AsciiDenyList::EMPTY)
+                uts46
+                    .to_ascii(
+                        black_box(input.as_bytes()),
+                        AsciiDenyList::EMPTY,
+                        Hyphens::Allow,
+                        DnsLength::Ignore,
+                    )
                     .unwrap()
             })
         });
