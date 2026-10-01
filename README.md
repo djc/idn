@@ -33,7 +33,10 @@ assert!(strict.to_ascii("_dmarc.example").is_err());
 Measured on an Apple M1 Max with Rust 1.97:
 
 - `idna` back end: selected by pinning `idna_adapter` in `Cargo.lock`
-  (`cargo update -p idna_adapter --precise <version>`)
+  (`cargo update -p idna_adapter --precise <version>`). The `idn` back end is the `idn` branch of
+  [`djc/idna_adapter`](https://github.com/djc/idna_adapter/tree/idn): with a checkout in
+  `../idna_adapter`, pass `--config 'patch.crates-io.idna_adapter.path="../idna_adapter"'` and
+  `--config 'patch.crates-io.idn.path="idn"'` to `cargo update -p idna_adapter` and `cargo bench`
 - `to_ascii` and `to_unicode`: geometric mean of the time per call over the inputs in the
   benchmark below, with the options used by the WHATWG URL Standard
 - Build time: clean build of the crate and its dependencies (`cargo build -p <crate>`)
