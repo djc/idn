@@ -105,7 +105,7 @@ pub enum Mode {
 /// Returns whether the General_Category of `c` is Mark (Mn, Mc or Me)
 #[inline]
 pub fn is_mark(c: char) -> bool {
-    PROPERTIES.get(c) & MARK_BIT != 0
+    properties().get(c) & MARK_BIT != 0
 }
 
 /// Returns whether the Canonical_Combining_Class of `c` is Virama
@@ -174,7 +174,7 @@ impl From<char> for BidiClass {
     /// Returns the Bidi_Class property value of `c`
     #[inline]
     fn from(c: char) -> Self {
-        BIDI_CLASSES[usize::from(PROPERTIES.get(c) & BIDI_CLASS_MASK)]
+        BIDI_CLASSES[usize::from(properties().get(c) & BIDI_CLASS_MASK)]
     }
 }
 
@@ -200,7 +200,7 @@ impl From<char> for JoiningType {
     /// Returns the Joining_Type property value of `c`
     #[inline]
     fn from(c: char) -> Self {
-        JOINING_TYPES[usize::from((PROPERTIES.get(c) >> JOINING_TYPE_SHIFT) & JOINING_TYPE_MASK)]
+        JOINING_TYPES[usize::from((properties().get(c) >> JOINING_TYPE_SHIFT) & JOINING_TYPE_MASK)]
     }
 }
 
@@ -600,7 +600,7 @@ struct Entry(u32);
 impl Entry {
     #[inline]
     fn of(c: char) -> Self {
-        Self(MAPPING.get(c))
+        Self(mapping().get(c))
     }
 
     #[inline]
@@ -708,17 +708,29 @@ impl<T: Copy> Trie<T> {
     }
 }
 
-static MAPPING: Trie<u32> = Trie {
-    first: &tables::MAPPING_FIRST,
-    second: &tables::MAPPING_SECOND,
-    third: &tables::MAPPING_THIRD,
-};
+/// Returns the trie of mapping table entries
+///
+/// The tries are built where they are used, so that lookups inlined into other crates know the
+/// table sizes. Those crates can't see the contents of a `static`, and a `const` can only refer to
+/// the tables (which are statics) since Rust 1.83.
+#[inline]
+fn mapping() -> Trie<u32> {
+    Trie {
+        first: &tables::MAPPING_FIRST,
+        second: &tables::MAPPING_SECOND,
+        third: &tables::MAPPING_THIRD,
+    }
+}
 
-static PROPERTIES: Trie<u16> = Trie {
-    first: &tables::PROPERTIES_FIRST,
-    second: &tables::PROPERTIES_SECOND,
-    third: &tables::PROPERTIES_THIRD,
-};
+/// Returns the trie of code point properties (see `mapping()`)
+#[inline]
+fn properties() -> Trie<u16> {
+    Trie {
+        first: &tables::PROPERTIES_FIRST,
+        second: &tables::PROPERTIES_SECOND,
+        third: &tables::PROPERTIES_THIRD,
+    }
+}
 
 const SECOND_MASK: usize = (1 << tables::SECOND_BITS) - 1;
 const THIRD_MASK: usize = (1 << tables::THIRD_BITS) - 1;
