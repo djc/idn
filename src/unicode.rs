@@ -339,7 +339,8 @@ impl Normalizer {
             Pending::Empty => {}
             Pending::Single(c) | Pending::Composed(c, _) => out.push(c),
             Pending::Buffered => {
-                compose(&mut self.segment, out);
+                let len = compose(&mut self.segment);
+                out.extend(self.segment[..len].iter().map(|&(c, _)| c));
                 self.segment.clear();
             }
         }
@@ -389,8 +390,9 @@ enum Pending {
 
 /// Applies the Canonical Ordering and Canonical Composition algorithms to a decomposed segment
 ///
-/// The result is appended to `out`. See UAX #15, sections 3.11 and 3.10.
-fn compose(segment: &mut [(char, u8)], out: &mut Vec<char>) {
+/// The composition is done in place: returns the length of the result, which is stored at the
+/// start of `segment`. See UAX #15, sections 3.11 and 3.10.
+fn compose(segment: &mut [(char, u8)]) -> usize {
     // Swap adjacent non-starters whose combining classes are out of order. This is an insertion
     // sort, which is stable and fast for the short runs of non-starters found in practice.
     for i in 1..segment.len() {
@@ -402,13 +404,15 @@ fn compose(segment: &mut [(char, u8)], out: &mut Vec<char>) {
         }
     }
 
-    let mut starter = None;
+    let mut len = 0;
+    let mut starter: Option<usize> = None;
     let mut last_ccc = None;
-    for &(c, ccc) in segment.iter() {
-        if let Some(index) = starter {
+    for i in 0..segment.len() {
+        let (c, ccc) = segment[i];
+        if let Some(start) = starter {
             if last_ccc.map_or(true, |last| last < ccc) {
-                if let Some(composed) = compose_pair(out[index], c) {
-                    out[index] = composed;
+                if let Some(composed) = compose_pair(segment[start].0, c) {
+                    segment[start].0 = composed;
                     continue;
                 }
             }
@@ -416,14 +420,17 @@ fn compose(segment: &mut [(char, u8)], out: &mut Vec<char>) {
 
         match ccc {
             0 => {
-                starter = Some(out.len());
+                starter = Some(len);
                 last_ccc = None;
             }
             _ => last_ccc = Some(ccc),
         }
 
-        out.push(c);
+        segment[len] = (c, ccc);
+        len += 1;
     }
+
+    len
 }
 
 /// Returns the primary composite for the pair `(first, second)`, if any
