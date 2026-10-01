@@ -9,6 +9,7 @@
 use alloc::vec::Vec;
 use core::iter::Fuse;
 use core::mem;
+use core::ops::{Deref, DerefMut};
 
 use crate::tables;
 
@@ -35,7 +36,7 @@ use crate::tables;
 pub struct Normalize<I> {
     input: Fuse<I>,
     normalizer: Normalizer,
-    ready: Vec<char>,
+    ready: Buffer<char, INLINE>,
     position: usize,
 }
 
@@ -45,7 +46,7 @@ impl<I: Iterator<Item = char>> Normalize<I> {
         Self {
             input: input.into_iter().fuse(),
             normalizer: Normalizer::new(mode),
-            ready: Vec::new(),
+            ready: Buffer::default(),
             position: 0,
         }
     }
@@ -271,7 +272,7 @@ pub(crate) fn normalize_into(
 struct Normalizer {
     mode: Mode,
     pending: Pending,
-    segment: Vec<(char, u8)>,
+    segment: Buffer<(char, u8), INLINE>,
 }
 
 impl Normalizer {
@@ -279,7 +280,7 @@ impl Normalizer {
         Self {
             mode,
             pending: Pending::Empty,
-            segment: Vec::new(),
+            segment: Buffer::default(),
         }
     }
 
@@ -287,7 +288,7 @@ impl Normalizer {
     ///
     /// ASCII code points are all valid or mapped to their lowercase form, and they are all
     /// composition boundaries, so they skip the table lookup.
-    fn push(&mut self, c: char, out: &mut Vec<char>) {
+    fn push(&mut self, c: char, out: &mut impl Extend<char>) {
         if c.is_ascii() {
             self.start(Pending::Single(c.to_ascii_lowercase()), out);
             return;
@@ -323,21 +324,21 @@ impl Normalizer {
     }
 
     /// Completes normalization, appending any remaining output to `out`
-    fn finish(&mut self, out: &mut Vec<char>) {
+    fn finish(&mut self, out: &mut impl Extend<char>) {
         self.flush(out);
     }
 
     /// Starts a new segment with `pending`, after finalizing the current one
-    fn start(&mut self, pending: Pending, out: &mut Vec<char>) {
+    fn start(&mut self, pending: Pending, out: &mut impl Extend<char>) {
         self.flush(out);
         self.pending = pending;
     }
 
     /// Finalizes the current segment, appending its NFC form to `out`
-    fn flush(&mut self, out: &mut Vec<char>) {
+    fn flush(&mut self, out: &mut impl Extend<char>) {
         match mem::replace(&mut self.pending, Pending::Empty) {
             Pending::Empty => {}
-            Pending::Single(c) | Pending::Composed(c, _) => out.push(c),
+            Pending::Single(c) | Pending::Composed(c, _) => out.extend([c]),
             Pending::Buffered => {
                 let len = compose(&mut self.segment);
                 out.extend(self.segment[..len].iter().map(|&(c, _)| c));
@@ -487,6 +488,79 @@ fn hangul_decomposition(c: char) -> Option<(char, char, Option<char>)> {
         t => Some(char::from_u32(HANGUL_T_BASE + t)?),
     };
     Some((l, v, t))
+}
+
+/// A vector that stores up to [`INLINE`] elements without allocating
+///
+/// Segments are short in practice, so that normalizing a label usually does not allocate.
+#[derive(Clone, Debug)]
+enum Buffer<T, const N: usize> {
+    Inline([T; N], usize),
+    Heap(Vec<T>),
+}
+
+impl<T: Copy + Default, const N: usize> Buffer<T, N> {
+    #[inline]
+    fn push(&mut self, value: T) {
+        match self {
+            Self::Inline(array, len) if *len < INLINE => {
+                array[*len] = value;
+                *len += 1;
+            }
+            Self::Inline(array, len) => {
+                let mut vec = Vec::with_capacity(2 * INLINE);
+                vec.extend_from_slice(&array[..*len]);
+                vec.push(value);
+                *self = Self::Heap(vec);
+            }
+            Self::Heap(vec) => vec.push(value),
+        }
+    }
+
+    #[inline]
+    fn clear(&mut self) {
+        match self {
+            Self::Inline(_, len) => *len = 0,
+            Self::Heap(vec) => vec.clear(),
+        }
+    }
+}
+
+impl<T: Copy + Default, const N: usize> Default for Buffer<T, N> {
+    fn default() -> Self {
+        Self::Inline([T::default(); N], 0)
+    }
+}
+
+impl<T: Copy + Default, const N: usize> Extend<T> for Buffer<T, N> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        for value in iter {
+            self.push(value);
+        }
+    }
+}
+
+impl<T, const N: usize> Deref for Buffer<T, N> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &[T] {
+        match self {
+            Self::Inline(array, len) => &array[..*len],
+            Self::Heap(vec) => vec,
+        }
+    }
+}
+
+impl<T, const N: usize> DerefMut for Buffer<T, N> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [T] {
+        match self {
+            Self::Inline(array, len) => &mut array[..*len],
+            Self::Heap(vec) => vec,
+        }
+    }
 }
 
 /// A mapping table entry, laid out as described in `tests/codegen.rs`
@@ -662,6 +736,9 @@ const JOINING_TYPES: [JoiningType; 6] = [
 
 const VIRAMA: u8 = 9;
 pub(crate) const REPLACEMENT: char = '\u{fffd}';
+
+/// The number of elements a [`Buffer`] stores without allocating
+const INLINE: usize = 8;
 
 const HANGUL_S_BASE: u32 = 0xac00;
 const HANGUL_L_BASE: u32 = 0x1100;

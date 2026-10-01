@@ -74,6 +74,41 @@ fn map_normalize_random_strings() {
     }
 }
 
+/// Long segments, which do not fit in the inline buffers of the implementation
+#[test]
+fn map_normalize_long_segments() {
+    let reference = Reference::get();
+    let alphabet = reference.interesting();
+    let mut marks = Vec::new();
+    for &c in &alphabet {
+        if reference.ccc(u32::from(c)) != 0 {
+            marks.push(c);
+        }
+    }
+
+    let mut rng = XorShift(0x9e37_79b9_7f4a_7c15);
+    for _ in 0..20_000 {
+        let len = 9 + rng.next() as usize % 32;
+        let mut input = Vec::with_capacity(len);
+        input.push(alphabet[rng.next() as usize % alphabet.len()]);
+        for _ in 1..len {
+            let c = match rng.next() % 8 {
+                0 => alphabet[rng.next() as usize % alphabet.len()],
+                _ => marks[rng.next() as usize % marks.len()],
+            };
+            input.push(c);
+        }
+
+        let expected = reference.nfc(&reference.map(&input, Ignored::Remove));
+        let actual = Normalize::new(input.iter().copied(), Mode::Map).collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{input:?}");
+
+        let expected = reference.nfc(&reference.map(&input, Ignored::Disallow));
+        let actual = Normalize::new(input.iter().copied(), Mode::Validate).collect::<Vec<_>>();
+        assert_eq!(actual, expected, "{input:?}");
+    }
+}
+
 /// Checks both the reference and the implementation against `NormalizationTest.txt`
 #[test]
 fn normalization_test() {
