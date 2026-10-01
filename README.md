@@ -20,17 +20,18 @@ assert!(strict.to_ascii("_dmarc.example").is_err());
 - Performance on par with or better than `idna` 1.1 with ICU4X (see below)
 - Passes all UTS #46 conformance tests for Unicode 18.0
 - No dependencies; `#![no_std]` (requires `alloc`); `#![forbid(unsafe_code)]`
-- Builds from scratch in about 0.4 seconds; 35% smaller binary sizes than idna 1.1
+- Builds from scratch in about 0.3 seconds; 34% smaller binary sizes than idna 1.1
 
 ## Comparison
 
 | | `to_ascii` | `to_unicode` | build time (debug / release) | dependencies | binary size | MSRV |
 |---|---:|---:|---:|---:|---:|---:|
-| `idn` | 120 ns | 102 ns | 0.4 s / 0.5 s | 0 | 103 KiB | 1.81 |
-| `idna` 1.1 with `idna_adapter` 1.2.2 (ICU4X 2.3) | 161 ns | 140 ns | 3.7 s / 4.4 s | 28 | 158 KiB | 1.88 |
-| `idna` 1.1 with `idna_adapter` 1.1.0 (unicode-rs) | 239 ns | 218 ns | 1.2 s / 1.7 s | 8 | 284 KiB | 1.57 |
+| `idn` | 75 ns | 63 ns | 0.3 s / 0.4 s | 0 | 105 KiB | 1.81 |
+| `idna` 1.1 with the `idn` back end (`idna_adapter` 1.3.0, unreleased) | 102 ns | 93 ns | 0.4 s / 0.7 s | 4 | 120 KiB | 1.81 |
+| `idna` 1.1 with `idna_adapter` 1.2.2 (ICU4X 2.3) | 110 ns | 96 ns | 2.7 s / 3.3 s | 28 | 160 KiB | 1.88 |
+| `idna` 1.1 with `idna_adapter` 1.1.0 (unicode-rs) | 148 ns | 136 ns | 0.9 s / 1.3 s | 8 | 286 KiB | 1.57 |
 
-Measured on an Apple M1 Max with Rust 1.97:
+Measured on an Apple M4 Max with Rust 1.98:
 
 - `idna` back end: selected by pinning `idna_adapter` in `Cargo.lock`
   (`cargo update -p idna_adapter --precise <version>`). The `idn` back end is the `idn` branch of
