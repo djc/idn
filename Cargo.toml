@@ -1,6 +1,5 @@
 [workspace]
 members = ["idn", "bench"]
-exclude = ["adapter"]
 resolver = "2"
 
 [workspace.lints.rust]

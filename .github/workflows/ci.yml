@@ -29,15 +29,6 @@ jobs:
       - run: cargo check --all-targets
       - run: cargo test
 
-  adapter:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: true
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --manifest-path adapter/Cargo.toml
-
   no-std:
     runs-on: ubuntu-latest
     steps:
@@ -52,13 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-        with:
-          submodules: true
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.81.0
       - run: cargo check -p idn
-      - run: cargo check --manifest-path adapter/Cargo.toml
 
   lint:
     runs-on: ubuntu-latest
