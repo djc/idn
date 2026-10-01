@@ -295,6 +295,7 @@ struct Normalizer {
 }
 
 impl Normalizer {
+    #[inline]
     fn new(mode: Mode) -> Self {
         Self {
             mode,
@@ -369,12 +370,17 @@ impl Normalizer {
             Pending::Empty => None,
             Pending::Single(c) | Pending::Composed(c, _) => Some(c),
             Pending::Buffered => {
-                let len = compose(&mut self.segment);
-                out.extend(self.segment[..len].iter().map(|&(c, _)| c));
-                self.segment.clear();
+                self.flush_buffered(out);
                 None
             }
         }
+    }
+
+    /// Finalizes the segment in the segment buffer, appending its NFC form to `out`
+    fn flush_buffered(&mut self, out: &mut impl Extend<char>) {
+        let len = compose(&mut self.segment);
+        out.extend(self.segment[..len].iter().map(|&(c, _)| c));
+        self.segment.clear();
     }
 
     /// Ensures that the current segment is stored in decomposed form in the segment buffer
@@ -557,6 +563,7 @@ impl<T: Copy + Default, const N: usize> Buffer<T, N> {
 }
 
 impl<T: Copy + Default, const N: usize> Default for Buffer<T, N> {
+    #[inline]
     fn default() -> Self {
         Self::Inline([T::default(); N], 0)
     }
