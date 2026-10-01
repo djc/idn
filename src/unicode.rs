@@ -36,6 +36,7 @@ use crate::tables;
 pub struct Normalize<I> {
     input: Fuse<I>,
     normalizer: Normalizer,
+    /// The NFC form of the last segment that did not consist of a single code point
     ready: Buffer<char, INLINE>,
     position: usize,
 }
@@ -55,23 +56,32 @@ impl<I: Iterator<Item = char>> Normalize<I> {
 impl<I: Iterator<Item = char>> Iterator for Normalize<I> {
     type Item = char;
 
+    #[inline]
     fn next(&mut self) -> Option<char> {
+        if let Some(&c) = self.ready.get(self.position) {
+            self.position += 1;
+            return Some(c);
+        }
+
+        self.ready.clear();
+        self.position = 0;
         loop {
-            if let Some(&c) = self.ready.get(self.position) {
-                self.position += 1;
+            let (flushed, end) = match self.input.next() {
+                Some(c) => (self.normalizer.push(c, &mut self.ready), false),
+                None => (self.normalizer.finish(&mut self.ready), true),
+            };
+
+            if flushed.is_some() {
+                return flushed;
+            }
+
+            if let Some(&c) = self.ready.first() {
+                self.position = 1;
                 return Some(c);
             }
 
-            self.ready.clear();
-            self.position = 0;
-            match self.input.next() {
-                Some(c) => self.normalizer.push(c, &mut self.ready),
-                None => {
-                    self.normalizer.finish(&mut self.ready);
-                    if self.ready.is_empty() {
-                        return None;
-                    }
-                }
+            if end {
+                return None;
             }
         }
     }
@@ -247,10 +257,14 @@ pub(crate) fn normalize_into(
 ) {
     let mut normalizer = Normalizer::new(mode);
     for c in input {
-        normalizer.push(c, out);
+        if let Some(c) = normalizer.push(c, out) {
+            out.push(c);
+        }
     }
 
-    normalizer.finish(out);
+    if let Some(c) = normalizer.finish(out) {
+        out.push(c);
+    }
 }
 
 /// Incremental implementation of UTS #46 mapping followed by NFC normalization
@@ -267,7 +281,8 @@ pub(crate) fn normalize_into(
 ///
 /// Most segments consist of a single mapped code point followed by a boundary. For those, the
 /// mapping data directly provides the composed result, and no decomposition or composition work
-/// is needed.
+/// is needed. Such a segment is returned directly when it is completed, while the NFC form of
+/// other segments is appended to an output buffer.
 #[derive(Clone, Debug)]
 struct Normalizer {
     mode: Mode,
@@ -284,14 +299,17 @@ impl Normalizer {
         }
     }
 
-    /// Feeds `c` to the normalizer, appending any completed output to `out`
+    /// Feeds `c` to the normalizer
+    ///
+    /// Returns the completed segment if it consists of a single code point. Otherwise, the NFC
+    /// form of a completed segment is appended to `out`.
     ///
     /// ASCII code points are all valid or mapped to their lowercase form, and they are all
     /// composition boundaries, so they skip the table lookup.
-    fn push(&mut self, c: char, out: &mut impl Extend<char>) {
+    #[inline]
+    fn push(&mut self, c: char, out: &mut impl Extend<char>) -> Option<char> {
         if c.is_ascii() {
-            self.start(Pending::Single(c.to_ascii_lowercase()), out);
-            return;
+            return self.start(Pending::Single(c.to_ascii_lowercase()), out);
         }
 
         let entry = Entry::of(c);
@@ -299,50 +317,58 @@ impl Normalizer {
             Kind::Keep => self.start(Pending::Single(c), out),
             Kind::Disallowed => self.start(Pending::Single(REPLACEMENT), out),
             Kind::Ignored => match self.mode {
-                Mode::Map => {}
+                Mode::Map => None,
                 Mode::Validate => self.start(Pending::Single(REPLACEMENT), out),
             },
             Kind::SingleBoundary => self.start(Pending::Single(entry.target(c)), out),
             Kind::Single => {
                 self.buffer();
                 self.push_decomposed(entry.target(c));
+                None
             }
             Kind::PoolComposed => {
                 let (composed, decomposed) = entry.pool_composed();
-                self.start(Pending::Composed(composed, decomposed), out);
+                self.start(Pending::Composed(composed, decomposed), out)
             }
             Kind::PoolBoundary => {
-                self.flush(out);
+                let flushed = self.flush(out);
                 self.buffer();
                 self.push_utf16(entry.pool());
+                flushed
             }
             Kind::Pool => {
                 self.buffer();
                 self.push_utf16(entry.pool());
+                None
             }
         }
     }
 
-    /// Completes normalization, appending any remaining output to `out`
-    fn finish(&mut self, out: &mut impl Extend<char>) {
-        self.flush(out);
+    /// Completes normalization, like [`Normalizer::push()`] for the end of the input
+    #[inline]
+    fn finish(&mut self, out: &mut impl Extend<char>) -> Option<char> {
+        self.flush(out)
     }
 
     /// Starts a new segment with `pending`, after finalizing the current one
-    fn start(&mut self, pending: Pending, out: &mut impl Extend<char>) {
-        self.flush(out);
+    #[inline]
+    fn start(&mut self, pending: Pending, out: &mut impl Extend<char>) -> Option<char> {
+        let flushed = self.flush(out);
         self.pending = pending;
+        flushed
     }
 
-    /// Finalizes the current segment, appending its NFC form to `out`
-    fn flush(&mut self, out: &mut impl Extend<char>) {
+    /// Finalizes the current segment, like [`Normalizer::push()`]
+    #[inline]
+    fn flush(&mut self, out: &mut impl Extend<char>) -> Option<char> {
         match mem::replace(&mut self.pending, Pending::Empty) {
-            Pending::Empty => {}
-            Pending::Single(c) | Pending::Composed(c, _) => out.extend([c]),
+            Pending::Empty => None,
+            Pending::Single(c) | Pending::Composed(c, _) => Some(c),
             Pending::Buffered => {
                 let len = compose(&mut self.segment);
                 out.extend(self.segment[..len].iter().map(|&(c, _)| c));
                 self.segment.clear();
+                None
             }
         }
     }
