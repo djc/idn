@@ -212,11 +212,7 @@ pub(crate) fn is_valid_nfc(label: &[char]) -> bool {
     }
 
     let mut normalized = Vec::with_capacity(label.len());
-    let mut normalizer = Normalizer::new(Mode::Validate);
-    for &c in label {
-        normalizer.push(c, &mut normalized);
-    }
-    normalizer.finish(&mut normalized);
+    normalize_into(label.iter().copied(), Mode::Validate, &mut normalized);
     normalized == label
 }
 
@@ -240,6 +236,22 @@ pub(crate) fn maps_to_full_stop(c: char) -> bool {
     entry.kind() == Kind::SingleBoundary && entry.target(c) == '.'
 }
 
+/// Appends the output of [`Normalize`] for `input` to `out`
+///
+/// Unlike the iterator, this appends completed segments directly to `out`, without buffering.
+pub(crate) fn normalize_into(
+    input: impl IntoIterator<Item = char>,
+    mode: Mode,
+    out: &mut Vec<char>,
+) {
+    let mut normalizer = Normalizer::new(mode);
+    for c in input {
+        normalizer.push(c, out);
+    }
+
+    normalizer.finish(out);
+}
+
 /// Incremental implementation of UTS #46 mapping followed by NFC normalization
 ///
 /// The mapping data stores, for each code point, the canonical decomposition of its mapping.
@@ -256,14 +268,14 @@ pub(crate) fn maps_to_full_stop(c: char) -> bool {
 /// mapping data directly provides the composed result, and no decomposition or composition work
 /// is needed.
 #[derive(Clone, Debug)]
-pub(crate) struct Normalizer {
+struct Normalizer {
     mode: Mode,
     pending: Pending,
     segment: Vec<(char, u8)>,
 }
 
 impl Normalizer {
-    pub(crate) fn new(mode: Mode) -> Self {
+    fn new(mode: Mode) -> Self {
         Self {
             mode,
             pending: Pending::Empty,
@@ -275,7 +287,7 @@ impl Normalizer {
     ///
     /// ASCII code points are all valid or mapped to their lowercase form, and they are all
     /// composition boundaries, so they skip the table lookup.
-    pub(crate) fn push(&mut self, c: char, out: &mut Vec<char>) {
+    fn push(&mut self, c: char, out: &mut Vec<char>) {
         if c.is_ascii() {
             self.start(Pending::Single(c.to_ascii_lowercase()), out);
             return;
@@ -311,7 +323,7 @@ impl Normalizer {
     }
 
     /// Completes normalization, appending any remaining output to `out`
-    pub(crate) fn finish(&mut self, out: &mut Vec<char>) {
+    fn finish(&mut self, out: &mut Vec<char>) {
         self.flush(out);
     }
 

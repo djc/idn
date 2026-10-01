@@ -40,7 +40,7 @@ mod tables;
 
 mod unicode;
 pub use unicode::{BidiClass, JoiningType, Mode, Normalize, is_mark, is_virama};
-use unicode::{Normalizer, REPLACEMENT};
+use unicode::{REPLACEMENT, normalize_into};
 
 /// Options for UTS #46 processing
 ///
@@ -295,11 +295,7 @@ impl Config {
             }
 
             let start = out.len();
-            let mut normalizer = Normalizer::new(Mode::Map);
-            for c in part.chars() {
-                normalizer.push(c, &mut out);
-            }
-            normalizer.finish(&mut out);
+            normalize_into(part.chars(), Mode::Map, &mut out);
 
             let mapped = &out[start..];
             if mapped.contains(&REPLACEMENT) {
@@ -838,7 +834,8 @@ fn input_offset(domain: &str, label: usize, index: usize, decoded: bool) -> usiz
         };
     }
 
-    let mapped = Normalize::new(part.chars(), Mode::Map).collect::<Vec<_>>();
+    let mut mapped = Vec::with_capacity(part.len());
+    normalize_into(part.chars(), Mode::Map, &mut mapped);
     let mut kept = part
         .char_indices()
         .filter(|&(_, c)| !unicode::is_ignored(c));
