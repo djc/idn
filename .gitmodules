@@ -1,4 +1,0 @@
-[submodule "adapter"]
-	path = adapter
-	url = https://github.com/djc/idna_adapter
-	branch = idn
