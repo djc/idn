@@ -1,9 +1,6 @@
 use core::hint::black_box;
 
-#[cfg(feature = "__bench_codspeed")]
 use codspeed_criterion_compat::{Criterion, criterion_group, criterion_main};
-#[cfg(not(feature = "__bench_codspeed"))]
-use criterion::{Criterion, criterion_group, criterion_main};
 use idn::Config;
 use idna::uts46::{AsciiDenyList, Hyphens, Uts46};
 
