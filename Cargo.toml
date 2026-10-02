@@ -1,6 +1,24 @@
-[workspace]
-members = ["idn"]
-resolver = "2"
+[package]
+name = "idn"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.81"
+description = "Fast, small and simple IDNA implementation"
+license = "MIT OR Apache-2.0"
+keywords = ["idna", "punycode", "unicode", "dns", "no-std"]
+categories = ["encoding", "internationalization", "no-std"]
+readme = "../README.md"
+include = ["src/**/*.rs", "LICENSE-*"]
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false }
+codspeed-criterion-compat = "5"
+idna = "1.1"
+idna-0-5 = { package = "idna", version = "0.5" }
+
+[[bench]]
+name = "compare"
+harness = false
 
 [workspace.lints.rust]
 elided_lifetimes_in_paths = "warn"
