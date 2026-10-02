@@ -54,17 +54,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
-name = "bench"
-version = "0.0.0"
-dependencies = [
- "codspeed-criterion-compat",
- "criterion",
- "idn",
- "idna 0.5.0",
- "idna 1.1.0",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -464,6 +453,12 @@ dependencies = [
 [[package]]
 name = "idn"
 version = "1.0.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "criterion",
+ "idna 0.5.0",
+ "idna 1.1.0",
+]
 
 [[package]]
 name = "idna"
